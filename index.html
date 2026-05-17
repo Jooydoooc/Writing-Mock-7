@@ -649,6 +649,9 @@
     const PASTE_THRESHOLD = 10;
     const RAPID_KEYSTROKE_THRESHOLD = 50;
     const MAX_SPEED_VIOLATIONS = 2;
+    const FOCUS_GRACE_MS = 1500;
+
+    let disengageTimer = null;
 
     function countWords(value) {
       const trimmed = (value || "").trim();
@@ -835,19 +838,47 @@
     }
 
     function activateAntiCheating() {
-      document.addEventListener("visibilitychange", function() {
-        if (document.hidden && isTestActive && !violationDetected) {
-          violations.tabSwitching++;
-          handleViolation('tab_switch', 'Tab switching detected');
+      // Notification banners, autofill popups, password managers, and
+      // right-click menus briefly blur the window without the user
+      // actually leaving the test. Only count a violation if the page
+      // stays disengaged (hidden OR unfocused) past FOCUS_GRACE_MS.
+
+      function scheduleDisengageCheck() {
+        if (!isTestActive || isSubmitted || violationDetected) return;
+        if (disengageTimer !== null) return;
+
+        disengageTimer = setTimeout(() => {
+          disengageTimer = null;
+          if (!isTestActive || isSubmitted || violationDetected) return;
+
+          const stillHidden = document.hidden;
+          const stillUnfocused = !document.hasFocus();
+          if (!stillHidden && !stillUnfocused) return;
+
+          if (stillHidden) {
+            violations.tabSwitching++;
+            handleViolation('tab_switch', 'Tab/window hidden');
+          } else {
+            violations.appSwitching++;
+            handleViolation('app_switch', 'Window lost focus');
+          }
+        }, FOCUS_GRACE_MS);
+      }
+
+      function cancelDisengageCheck() {
+        if (disengageTimer !== null) {
+          clearTimeout(disengageTimer);
+          disengageTimer = null;
         }
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) scheduleDisengageCheck();
+        else cancelDisengageCheck();
       });
 
-      window.addEventListener("blur", function() {
-        if (isTestActive && !violationDetected) {
-          violations.appSwitching++;
-          handleViolation('app_switch', 'Application switching detected');
-        }
-      });
+      window.addEventListener("blur", scheduleDisengageCheck);
+      window.addEventListener("focus", cancelDisengageCheck);
     }
 
     function handleViolation(type, reason) {
