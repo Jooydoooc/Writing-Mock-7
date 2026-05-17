@@ -1,7 +1,15 @@
 export default async function handler(req, res) {
   try {
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
+
     if (req.method !== "POST") {
       return res.status(405).json({ success: false, error: "Method not allowed" });
+    }
+
+    if (!isAllowedCaller(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
     }
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -56,6 +64,34 @@ export default async function handler(req, res) {
       error: err?.message || "Server error"
     });
   }
+}
+
+function isAllowedCaller(req) {
+  const allowed = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (allowed.length === 0) {
+    return true;
+  }
+
+  const origin = req.headers.origin;
+  if (origin && allowed.includes(origin)) {
+    return true;
+  }
+
+  const referer = req.headers.referer;
+  if (referer) {
+    try {
+      const refOrigin = new URL(referer).origin;
+      if (allowed.includes(refOrigin)) return true;
+    } catch {
+      // fall through
+    }
+  }
+
+  return false;
 }
 
 function splitIntoChunks(text, maxLen) {

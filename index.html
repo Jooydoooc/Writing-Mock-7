@@ -590,12 +590,21 @@
     </div>
   </div>
 
+  <div id="violationWarningModal" class="modal">
+    <div class="modal-content">
+      <h2>Warning: Test Rule Violation</h2>
+      <p id="violationWarningMessage"></p>
+      <p>Next violation will result in automatic test termination.</p>
+      <button onclick="closeViolationWarning()">I Understand</button>
+    </div>
+  </div>
+
   <script>
-    let chosenTask1 = { 
-      question: "The graph below shows the number of inquiries received by the Tourist Information Office in one city over a six-month period in 2011.\n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.\n\nWrite at least 150 words.", 
-      image: "https://i.ibb.co/4RmQYKpw/line-grapht-task-one.jpg" 
+    let chosenTask1 = {
+      question: "The maps show the changes that have taken place at the waterfront area of a town - Darwin - between 2009 and 2014.\n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.\n\nWrite at least 150 words.",
+      image: "https://i.ibb.co/MytsXfNf/Screenshot-2026-05-13-at-14-40-39.png"
     };
-    let chosenTask2 = "In many countries, traditional foods are being replaced by fast food. This has a negative impact on families, individuals, and society. To what extent do you agree or disagree?";
+    let chosenTask2 = "Large shopping malls are becoming more popular than small local shops.\n\nDo the advantages of this development outweigh the disadvantages?\n\nWrite at least 250 words.";
     let totalSeconds = 60 * 60;
     let isTestActive = false;
     let warningCount = 0;
@@ -640,6 +649,11 @@
     const PASTE_THRESHOLD = 10;
     const RAPID_KEYSTROKE_THRESHOLD = 50;
     const MAX_SPEED_VIOLATIONS = 2;
+
+    function countWords(value) {
+      const trimmed = (value || "").trim();
+      return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+    }
 
     function initializePage() {
       document.getElementById("rulesScreen").style.display = "flex";
@@ -732,15 +746,15 @@
 
     function handlePaste(task) {
       if (!isTestActive || isSubmitted) return;
-      
+
       const data = typingData[`task${task}`];
       const textarea = document.getElementById(`textarea${task}`);
-      const beforePasteWords = textarea.value.trim().split(/\s+/).length;
-      
+      const beforePasteWords = countWords(textarea.value);
+
       setTimeout(() => {
-        const afterPasteWords = textarea.value.trim().split(/\s+/).length;
+        const afterPasteWords = countWords(textarea.value);
         const wordIncrease = afterPasteWords - beforePasteWords;
-        
+
         if (wordIncrease > PASTE_THRESHOLD) {
           data.pasteEvents++;
           violations.pasteDetected++;
@@ -753,7 +767,7 @@
       const data = typingData[`task${task}`];
       const now = Date.now();
       const textarea = document.getElementById(`textarea${task}`);
-      const currentWordCount = textarea.value.trim().split(/\s+/).length;
+      const currentWordCount = countWords(textarea.value);
       
       if (data.lastCalculationTime > 0) {
         const timeDiff = (now - data.lastCalculationTime) / 1000 / 60;
@@ -839,19 +853,22 @@
     function handleViolation(type, reason) {
       violationDetected = true;
       violations.total++;
-      
+
       warningCount++;
       updateViolationCounter();
-      
+
       if (warningCount >= maxWarnings) {
         document.getElementById("warningModal").style.display = "flex";
       } else {
-        alert(`Warning ${warningCount}/${maxWarnings}: ${getViolationMessage(type)} \n\nNext violation will result in automatic test termination.`);
-        
-        setTimeout(() => {
-          violationDetected = false;
-        }, 1000);
+        document.getElementById("violationWarningMessage").textContent =
+          `Warning ${warningCount}/${maxWarnings}: ${getViolationMessage(type)}`;
+        document.getElementById("violationWarningModal").style.display = "flex";
       }
+    }
+
+    function closeViolationWarning() {
+      document.getElementById("violationWarningModal").style.display = "none";
+      violationDetected = false;
     }
 
     function getViolationMessage(type) {
@@ -865,8 +882,7 @@
     }
 
     function updateWordCount(part) {
-      const text = document.getElementById("textarea" + part).value.trim();
-      const wordCount = text === "" ? 0 : text.split(/\s+/).length;
+      const wordCount = countWords(document.getElementById("textarea" + part).value);
       const countElement = document.getElementById("count" + part);
       countElement.textContent = "Words: " + wordCount;
       
@@ -932,8 +948,8 @@
       
       const task1Answer = document.getElementById("textarea1").value;
       const task2Answer = document.getElementById("textarea2").value;
-      const task1WordCount = task1Answer.trim() === "" ? 0 : task1Answer.trim().split(/\s+/).length;
-      const task2WordCount = task2Answer.trim() === "" ? 0 : task2Answer.trim().split(/\s+/).length;
+      const task1WordCount = countWords(task1Answer);
+      const task2WordCount = countWords(task2Answer);
       const totalWords = task1WordCount + task2WordCount;
       
       const telegramMessage = `📝 IELTS WRITING TEST SUBMITTED
@@ -945,24 +961,19 @@
 • Timestamp: ${new Date().toLocaleString()}
 • Duration: ${(60 * 60 - totalSeconds)} seconds
 
-📋 TASK 1 - GRAPH DESCRIPTION
+📋 TASK 1
 Question:
-The graph below shows the number of inquiries received by the Tourist Information Office in one city over a six-month period in 2011.
-
-Summarise the information by selecting and reporting the main features, and make comparisons where relevant.
-
-Write at least 150 words.
+${chosenTask1.question}
 
 📝 Student's Answer:
 ${task1Answer}
 
 📊 Task 1 Statistics:
 • Words: ${task1WordCount}
-• Actual Word Count: ${task1WordCount}
 
-📝 TASK 2 - ESSAY WRITING
+📝 TASK 2
 Question:
-In many countries, traditional foods are being replaced by fast food. This has a negative impact on families, individuals, and society. To what extent do you agree or disagree?
+${chosenTask2}
 
 📝 Student's Answer:
 ${task2Answer}
